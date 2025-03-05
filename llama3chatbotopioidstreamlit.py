@@ -89,7 +89,7 @@ def query_llama3(question, context=""):
         return f"ERROR: Unable to connect to Llama 3. Details: {str(error)}"
 
 # Capture user input
-question = st.text_input("Enter a question about opioids:")
+question = st.text_input("👤 You: Enter a question about opioids:")
 
 if question:
     if validate_question(question):
@@ -98,4 +98,4 @@ if question:
         response = "I can only respond to inquiries about opioids, addiction, overdose, or withdrawal."
 
     # Display chatbot response
-    st.write(f"**Response:** {response}")
+    st.write(f"🤖 Chatbot: {response}")
