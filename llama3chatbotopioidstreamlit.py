@@ -4,94 +4,99 @@ import pdfplumber
 import streamlit as st
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-# Load API endpoint and key securely
-LLAMA3_ENDPOINT = os.getenv("LLAMA3_ENDPOINT")
-LLAMA3_API_KEY = os.getenv("LLAMA3_API_KEY")
+# Retrieve API credentials
+API_KEY = os.getenv("LLAMA3_API_KEY")
+API_URL = os.getenv("LLAMA3_ENDPOINT")
 
-# Debugging: Print API key (Remove this after confirming it's working)
-print(f"Loaded API Key: {LLAMA3_API_KEY}")
+# Debugging: Display API key status (remove after verification)
+print(f"API Key Loaded: {API_KEY}")
 
-# Ensure API Key is loaded correctly
-if not LLAMA3_API_KEY:
-    st.error("API Key not found! Check your .env file.")
+# Halt execution if API Key is missing
+if not API_KEY:
+    st.error("API Key not found! Ensure it's set in the .env file.")
     st.stop()
 
-# Function to extract text from a PDF
-def extract_text_from_pdf(pdf_path):
-    text = ""
+# Extract text from a single PDF file
+def extract_text(pdf_path):
+    content = ""
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             extracted_text = page.extract_text()
             if extracted_text:
-                text += extracted_text + "\n"
-    return text
+                content += extracted_text + "\n"
+    return content
 
-# Function to read multiple PDFs from a folder
-def read_pdfs_in_folder(folder_path):
-    pdf_text = ""
-    for filename in os.listdir(folder_path):
-        if filename.endswith(".pdf"):
-            pdf_path = os.path.join(folder_path, filename)
-            pdf_text += extract_text_from_pdf(pdf_path) + "\n"
-    return pdf_text
+# Read text from multiple PDFs in a directory
+def process_pdf_folder(directory):
+    text_data = ""
+    for file in os.listdir(directory):
+        if file.endswith(".pdf"):
+            pdf_file_path = os.path.join(directory, file)
+            text_data += extract_text(pdf_file_path) + "\n"
+    return text_data
 
-# List of relevant opioid-related keywords
-relevant_topics = [
-    "opioids", "addiction", "overdose", "withdrawal", "fentanyl", "heroin",
-    "painkillers", "narcotics", "opioid crisis", "naloxone", "rehab", "opiates",
-    "opium", "substance abuse", "drugs", "tolerance", "help", "assistance", "support"
+# Define opioid-related keywords
+keywords = [
+    "heroin", "opioid crisis", "rehab", "tolerance", "substance abuse",
+    "overdose", "narcotics", "help", "opiates", "fentanyl",
+    "withdrawal", "opioids", "support", "addiction", "naloxone", "drugs", "painkillers"
 ]
 
-# Function to check if a question is relevant
-def is_question_relevant(question):
-    return any(topic.lower() in question.lower() for topic in relevant_topics)
+# Determine if a question is relevant
+def validate_question(user_input):
+    return any(term.lower() in user_input.lower() for term in keywords)
 
-# Function to send the question to Llama 3 API
-def get_llama3_response(question, context):
+# Communicate with Llama 3 API for answers
+def query_llama3(question, context):
     """
-    Sends a request to OpenRouter Llama 3 API.
+    Interacts with OpenRouter's Llama 3 API.
     """
     headers = {
-        "Authorization": f"Bearer {LLAMA3_API_KEY.strip()}",
+        "Authorization": f"Bearer {API_KEY.strip()}",
         "Content-Type": "application/json"
     }
 
     prompt = f"""
-    You are an expert in opioid education. Answer the user's question as clearly as possible using the provided document as reference.
-    If the document doesn't contain the answer, just say "I don't have enough information."
+    As an opioid education expert, provide clear and precise answers using the given document.
+    If insufficient data is available, respond with: "I don't have enough information."
     """
 
-    payload = {
+    data = {
         "model": "meta-llama/llama-3-8b-instruct",
         "messages": [{"role": "user", "content": question}],
     }
 
     try:
-        response = requests.post(LLAMA3_ENDPOINT, headers=headers, json=payload, timeout=10)
-        response.raise_for_status()  # Raise an error for HTTP issues
-        data = response.json()
-        response_text = data.get("choices", [{}])[0].get("message", {}).get("content", "No response").strip()
+        response = requests.post(API_URL, headers=headers, json=data, timeout=10)
+        response.raise_for_status()
+        response_content = response.json()
+        result = response_content.get("choices", [{}])[0].get("message", {}).get("content", "No response").strip()
 
-        # Remove unwanted phrases
-        unwanted_phrases = ["Based on the document", "According to the document"]
-        for phrase in unwanted_phrases:
-            response_text = response_text.replace(phrase, "").strip()
+        # Remove unnecessary phrases
+        for phrase in ["Based on the document", "According to the document"]:
+            result = result.replace(phrase, "").strip()
 
-        return response_text
+        return result
 
-    except requests.exceptions.RequestException as e:
-        st.error(f"Llama 3 API error: {str(e)}")
-        return f"ERROR: Failed to connect to Llama 3 instance. Details: {str(e)}"
+    except requests.exceptions.RequestException as error:
+        st.error(f"API Connection Error: {str(error)}")
+        return f"ERROR: Unable to connect to Llama 3. Details: {str(error)}"
 
-# Streamlit Interface
+# Streamlit Chatbot Interface
 st.title("📖 Opioid Awareness Chatbot")
-st.markdown("Welcome to the Opioid Awareness Chatbot! Here you will learn all about opioids.")
+st.markdown("Learn about opioids through this interactive chatbot!")
 
-# User Input
-user_question = st.text_input("Ask a question related to opioids:")
+# Capture user input
+question = st.text_input("Enter a question about opioids:")
 
-if user_question:
-    if is_question_relevant(user_question)
+if question:
+    if validate_question(question):
+        response = query_llama3(question, "")
+    else:
+        response = "I can only respond to inquiries about opioids, addiction, overdose, or withdrawal."
+
+    # Display chatbot response
+    st.write(f"**Response:** {response}")
