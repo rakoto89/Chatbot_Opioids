@@ -18,8 +18,7 @@ st.title("🩺 Opioid Awareness Chatbot")
 st.markdown(
     """
     ### Welcome to the Opioid Awareness Chatbot!
-    Here you will learn all about opioids, addiction, overdose prevention, and treatment.
-    Ask any question related to opioids, and I'll provide educational insights.
+    Here you will learn all about opioids!
     """
 )
 
