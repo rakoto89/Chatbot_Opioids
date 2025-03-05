@@ -4,85 +4,79 @@ import pdfplumber
 import streamlit as st
 from dotenv import load_dotenv
 
+# Load environment variables from .env file
 load_dotenv()
 
-# Load Llama 3 API endpoint and API key from environment variables
-LLAMA3_ENDPOINT = os.environ.get("LLAMA3_ENDPOINT", "https://openrouter.ai/api/v1/chat/completions").strip()
-LLAMA3_API_KEY = os.environ.get("LLAMA3_API_KEY", "").strip()  # Secure API key handling
+# Load API endpoint and key securely
+LLAMA3_ENDPOINT = os.getenv("LLAMA3_ENDPOINT")
+LLAMA3_API_KEY = os.getenv("LLAMA3_API_KEY")
 
-def extract_text_from_pdf(pdf_paths):
+# Debugging: Print API key (Remove this after confirming it's working)
+print(f"Loaded API Key: {LLAMA3_API_KEY}")
+
+# Ensure API Key is loaded correctly
+if not LLAMA3_API_KEY:
+    st.error("API Key not found! Check your .env file.")
+    st.stop()
+
+# Function to extract text from a PDF
+def extract_text_from_pdf(pdf_path):
     text = ""
-    # for pdf_path in pdf_paths:
-    with pdfplumber.open(pdf_paths) as pdf:
+    with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             extracted_text = page.extract_text()
             if extracted_text:
                 text += extracted_text + "\n"
-    return text.strip()
-import PyPDF2
-pdf_text=''
+    return text
+
+# Function to read multiple PDFs from a folder
 def read_pdfs_in_folder(folder_path):
-    # Navigate through the folder
-    concatenated_text = ''
+    pdf_text = ""
     for filename in os.listdir(folder_path):
-        print(filename)
-        if filename.endswith('.pdf'):
+        if filename.endswith(".pdf"):
             pdf_path = os.path.join(folder_path, filename)
-            print(pdf_path)
-            pdf_text=extract_text_from_pdf(pdf_path)
-            #print(pdf_text)
-            concatenated_text += pdf_text + '\n\n'
-    return concatenated_text
-pdf_text=read_pdfs_in_folder('pdfs')
-print(pdf_text)
+            pdf_text += extract_text_from_pdf(pdf_path) + "\n"
+    return pdf_text
 
 # List of relevant opioid-related keywords
 relevant_topics = [
-    "opioids", "addiction", "overdose", "withdrawal", "fentanyl", "heroin", 
-    "painkillers", "narcotics", "opioid crisis", "naloxone", "rehab", "opiates", "opium", "substance abuse", "drugs", "tolerance", "opiates", "help", "assistance", "support", "support for opioid addiction", "support for opioid" "opium", "opiate", "drug" "email", "campus", "phone number", "BSU", "Bowie State University", "opioid", "use", "disorder", "opioid use", "opioid disorder", "opioid usage", "usage", "taking opioids", "taking", "recreational use", "opioid dependence", "opioid self-medication", "self medication"
+    "opioids", "addiction", "overdose", "withdrawal", "fentanyl", "heroin",
+    "painkillers", "narcotics", "opioid crisis", "naloxone", "rehab", "opiates",
+    "opium", "substance abuse", "drugs", "tolerance", "help", "assistance", "support"
 ]
 
+# Function to check if a question is relevant
 def is_question_relevant(question):
-    """Checks if the question contains opioid-related keywords"""
     return any(topic.lower() in question.lower() for topic in relevant_topics)
 
+# Function to send the question to Llama 3 API
 def get_llama3_response(question, context):
-    """Sends a request to the OpenRouter Llama 3 API with API key authentication"""
-    opioid_context = (
-        "You are an expert in opioid education. Answer the user's question as clearly "
-        "as possible using the document as reference, but NEVER mention the document, "
-        "the source, or phrases like 'Based on the document' or 'According to the document'. "
-        "Just provide a direct answer, as if you already knew the information."
-    )
-
-    prompt = f"Answer the question concisely and naturally without mentioning the document or saying 'Based on the document', 'provided text'. \n\nHere is the document content:\n{context}\n\nQuestion: {question}"
-
-    # Set up headers with API key
+    """
+    Sends a request to OpenRouter Llama 3 API.
+    """
     headers = {
         "Authorization": f"Bearer {LLAMA3_API_KEY.strip()}",
         "Content-Type": "application/json"
     }
 
+    prompt = f"""
+    You are an expert in opioid education. Answer the user's question as clearly as possible using the provided document as reference.
+    If the document doesn't contain the answer, just say "I don't have enough information."
+    """
+
+    payload = {
+        "model": "meta-llama/llama-3-8b-instruct",
+        "messages": [{"role": "user", "content": question}],
+    }
+
     try:
-        response = requests.post(
-            LLAMA3_ENDPOINT,
-            json={
-                "model": "meta-llama/llama-3.1-8b-instruct:free",  # Use the model name set in OpenRouter
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            headers=headers,  # Pass API key
-            timeout=10
-        )
-
-        response.raise_for_status()  # Raise an error for HTTP errors
-
+        response = requests.post(LLAMA3_ENDPOINT, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()  # Raise an error for HTTP issues
         data = response.json()
-        response_text = data.get("choices", [{}])[0].get("message", {}).get("content", "No response").replace("*", "")
+        response_text = data.get("choices", [{}])[0].get("message", {}).get("content", "No response").strip()
 
-        # List of unwanted phrases to remove
-        unwanted_phrases = ["Based on the document", "According to the document", "From the document"]
-
-        # Remove unwanted phrases from the response
+        # Remove unwanted phrases
+        unwanted_phrases = ["Based on the document", "According to the document"]
         for phrase in unwanted_phrases:
             response_text = response_text.replace(phrase, "").strip()
 
@@ -92,18 +86,12 @@ def get_llama3_response(question, context):
         st.error(f"Llama 3 API error: {str(e)}")
         return f"ERROR: Failed to connect to Llama 3 instance. Details: {str(e)}"
 
-# Streamlit interface
-st.title("Opioid Awareness Chatbot")
-st.markdown("🤖 Welcome to the Opioid Awareness Chatbot! Here you will learn all about opioids!")
+# Streamlit Interface
+st.title("📖 Opioid Awareness Chatbot")
+st.markdown("Welcome to the Opioid Awareness Chatbot! Here you will learn all about opioids.")
 
-# Get user input
+# User Input
 user_question = st.text_input("Ask a question related to opioids:")
 
 if user_question:
-    if is_question_relevant(user_question):
-        answer = get_llama3_response(user_question, pdf_text)
-    else:
-        answer = "Sorry, I can only answer questions related to opioids, addiction, overdose, or withdrawal."
-
-    # Display the response
-    st.write(f"Answer: {answer}")
+    if is_question_relevant(user_question)
