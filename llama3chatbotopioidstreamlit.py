@@ -3,8 +3,8 @@ import requests
 import pdfplumber
 
 # Retrieve API credentials from Streamlit secrets
-API_KEY = st.secrets["openrouter"]["api_key"]
-API_URL = st.secrets["openrouter"]["endpoint"]
+API_KEY = st.secrets["openrouter"]["API_KEY_ST"]
+API_URL = st.secrets["openrouter"]["LLAMA3_1_ENDPOINT"]
 
 # Halt execution if API Key is missing
 if not API_KEY:
