@@ -12,7 +12,7 @@ if not API_KEY:
     st.stop()
 
 # Streamlit Chatbot Interface
-st.title("🩺 Opioid Awareness Chatbot")
+st.title("💊 Opioid Awareness Chatbot")
 
 # **Introductory message**
 st.markdown(
