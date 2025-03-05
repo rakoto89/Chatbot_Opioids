@@ -65,7 +65,7 @@ def query_llama3(question, context):
     """
 
     data = {
-        "model": "meta-llama/llama-3-8b-instruct",
+        "model": "meta-llama/llama-3.1-8b-instruct:free",
         "messages": [{"role": "user", "content": question}],
     }
 
