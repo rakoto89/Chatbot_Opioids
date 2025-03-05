@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 import pdfplumber
+import pyttsx3
+import speech_recognition as sr
 
 # Retrieve API credentials from Streamlit secrets
 API_KEY = st.secrets["openrouter"]["API_KEY"]
@@ -87,8 +89,39 @@ def query_llama3(question, context=""):
         st.error(f"API Connection Error: {str(error)}")
         return f"ERROR: Unable to connect to Llama 3. Details: {str(error)}"
 
+# Function for voice input using speech recognition
+def listen_to_speech():
+    recognizer = sr.Recognizer()
+    microphone = sr.Microphone()
+
+    with microphone as source:
+        recognizer.adjust_for_ambient_noise(source)
+        st.info("Listening... Please ask your question.")
+        audio = recognizer.listen(source)
+
+    try:
+        question = recognizer.recognize_google(audio)
+        st.write(f"👤 You: {question}")
+        return question
+    except sr.UnknownValueError:
+        st.error("Sorry, I could not understand the audio.")
+        return None
+    except sr.RequestError:
+        st.error("Sorry, I could not request results from Google Speech Recognition service.")
+        return None
+
+# Function to speak the response
+def speak_response(response):
+    engine = pyttsx3.init()
+    engine.say(response)
+    engine.runAndWait()
+
 # Capture user input
 question = st.text_input("👤 You: Enter a question about opioids:")
+
+# Add voice button
+if st.button("🎙️ Ask by Voice"):
+    question = listen_to_speech()
 
 if question:
     if validate_question(question):
@@ -98,3 +131,7 @@ if question:
 
     # Display chatbot response
     st.write(f"🤖 Chatbot: {response}")
+    
+    # Speak the response
+    speak_response(response)
+
