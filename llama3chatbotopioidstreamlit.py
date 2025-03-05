@@ -1,23 +1,27 @@
-import os
+import streamlit as st
 import requests
 import pdfplumber
-import streamlit as st
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
-# Retrieve API credentials
-API_KEY = os.getenv("API_KEY_ST", "").strip()
-API_URL = os.getenv("LLAMA3_ENDPOINT", "").strip()
-
-# Debugging: Display API key status (remove after verification)
-print(f"DEBUG - Loaded API Key: {API_KEY}")
+# Retrieve API credentials from Streamlit secrets
+API_KEY = st.secrets["openrouter"]["api_key"]
+API_URL = st.secrets["openrouter"]["endpoint"]
 
 # Halt execution if API Key is missing
 if not API_KEY:
-    st.error("API Key not found! Ensure it's set in the .env file.")
+    st.error("API Key not found! Ensure it's set in Streamlit Cloud secrets.")
     st.stop()
+
+# Streamlit Chatbot Interface
+st.title("🩺 Opioid Awareness Chatbot")
+
+# **Introductory message**
+st.markdown(
+    """
+    ### Welcome to the Opioid Awareness Chatbot!
+    Here you will learn all about opioids, addiction, overdose prevention, and treatment.
+    Ask any question related to opioids, and I'll provide educational insights.
+    """
+)
 
 # Extract text from a single PDF file
 def extract_text(pdf_path):
@@ -50,12 +54,11 @@ def validate_question(user_input):
     return any(term.lower() in user_input.lower() for term in keywords)
 
 # Communicate with Llama 3 API for answers
-def query_llama3(question, context):
-    """
-    Interacts with OpenRouter's Llama 3 API.
-    """
+def query_llama3(question, context=""):
+    """Interacts with OpenRouter's Llama 3 API."""
+    
     headers = {
-        "Authorization": f"Bearer {API_KEY.strip()}",
+        "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
 
@@ -65,7 +68,7 @@ def query_llama3(question, context):
     """
 
     data = {
-        "model": "meta-llama/llama-3.1-8b-instruct:free",
+        "model": "meta-llama/llama-3-8b-instruct:free",
         "messages": [{"role": "user", "content": question}],
     }
 
@@ -84,10 +87,6 @@ def query_llama3(question, context):
     except requests.exceptions.RequestException as error:
         st.error(f"API Connection Error: {str(error)}")
         return f"ERROR: Unable to connect to Llama 3. Details: {str(error)}"
-
-# Streamlit Chatbot Interface
-st.title("📖 Opioid Awareness Chatbot")
-st.markdown("Learn about opioids through this interactive chatbot!")
 
 # Capture user input
 question = st.text_input("Enter a question about opioids:")
