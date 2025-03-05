@@ -12,7 +12,7 @@ API_KEY = os.getenv("API_KEY_ST", "").strip()
 API_URL = os.getenv("LLAMA3_ENDPOINT", "").strip()
 
 # Debugging: Display API key status (remove after verification)
-print(f"API Key Loaded: {API_KEY}")
+print(f"DEBUG - Loaded API Key: {API_KEY}")
 
 # Halt execution if API Key is missing
 if not API_KEY:
