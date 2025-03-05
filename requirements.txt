@@ -6,3 +6,4 @@ PyPDF2
 speechrecognition
 gtts
 pyttsx3
+pyaudio
