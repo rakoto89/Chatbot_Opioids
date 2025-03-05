@@ -2,6 +2,9 @@ import os
 import requests
 import pdfplumber
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Load Llama 3 API endpoint and API key from environment variables
 LLAMA3_ENDPOINT = os.environ.get("LLAMA3_ENDPOINT", "https://openrouter.ai/api/v1/chat/completions").strip()
