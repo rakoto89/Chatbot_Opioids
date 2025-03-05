@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Retrieve API credentials
-API_KEY = os.getenv("API_KEY_ST")
-API_URL = os.getenv("LLAMA3_ENDPOINT")
+API_KEY = os.getenv("API_KEY_ST", "").strip()
+API_URL = os.getenv("LLAMA3_ENDPOINT", "").strip()
 
 # Debugging: Display API key status (remove after verification)
 print(f"API Key Loaded: {API_KEY}")
