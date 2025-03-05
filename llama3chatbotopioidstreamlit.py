@@ -3,6 +3,9 @@ import requests
 import pdfplumber
 import pyttsx3
 import speech_recognition as sr
+import sounddevice as sd
+import numpy as np
+import wave
 
 # Retrieve API credentials from Streamlit secrets
 API_KEY = st.secrets["openrouter"]["API_KEY"]
@@ -89,13 +92,11 @@ def query_llama3(question, context=""):
         st.error(f"API Connection Error: {str(error)}")
         return f"ERROR: Unable to connect to Llama 3. Details: {str(error)}"
 
-# Function for voice input using speech recognition
+# Function for voice input using speech recognition with sounddevice
 def listen_to_speech():
     recognizer = sr.Recognizer()
-    microphone = sr.Microphone()
-
-    with microphone as source:
-        recognizer.adjust_for_ambient_noise(source)
+    # Record the audio using sounddevice
+    with sd.InputStream(callback=audio_callback):
         st.info("Listening... Please ask your question.")
         audio = recognizer.listen(source)
 
@@ -116,10 +117,7 @@ def speak_response(response):
     engine.say(response)
     engine.runAndWait()
 
-# Capture user input
-question = st.text_input("👤 You: Enter a question about opioids:")
-
-# Add voice button
+# Add button for voice input
 if st.button("🎙️ Ask by Voice"):
     question = listen_to_speech()
 
@@ -134,4 +132,3 @@ if question:
     
     # Speak the response
     speak_response(response)
-
