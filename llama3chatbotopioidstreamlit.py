@@ -1,97 +1,100 @@
 import streamlit as st
 import requests
 import pdfplumber
-import speech_recognition as sr
-from gtts import gTTS
-import tempfile
-import os
 
-# Inject JavaScript to handle audio recording
+# Retrieve API credentials from Streamlit secrets
+API_KEY = st.secrets["openrouter"]["API_KEY"]
+API_URL = st.secrets["openrouter"]["LLAMA3_1_ENDPOINT"]
+
+# Halt execution if API Key is missing
+if not API_KEY:
+    st.error("API Key not found! Ensure it's set in Streamlit Cloud secrets.")
+    st.stop()
+
+# Streamlit Chatbot Interface
+st.title("💊 Opioid Awareness Chatbot")
+
+# **Introductory message**
 st.markdown(
     """
-    <script>
-        let mediaRecorder;
-        let audioChunks = [];
-
-        function startRecording() {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => {
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.start();
-                
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    const downloadLink = document.createElement('a');
-                    downloadLink.href = audioUrl;
-                    downloadLink.download = 'recorded_audio.wav';
-                    downloadLink.click();
-                };
-            })
-            .catch(error => console.error("Error accessing microphone: ", error));
-        }
-
-        function stopRecording() {
-            if (mediaRecorder) {
-                mediaRecorder.stop();
-            }
-        }
-    </script>
-    """,
-    unsafe_allow_html=True,
+    ### Welcome to the Opioid Awareness Chatbot!
+    Here you will learn all about opioids!
+    """
 )
 
-# Function to convert speech to text
-def speech_to_text(audio_path):
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(audio_path) as source:
-        audio_data = recognizer.record(source)
-        try:
-            return recognizer.recognize_google(audio_data)
-        except sr.UnknownValueError:
-            return "Sorry, I couldn't understand the audio."
-        except sr.RequestError:
-            return "Speech recognition service is unavailable."
+# Extract text from a single PDF file
+def extract_text(pdf_path):
+    content = ""
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            extracted_text = page.extract_text()
+            if extracted_text:
+                content += extracted_text + "\n"
+    return content
 
-# Function for text-to-speech response
-def text_to_speech(response_text):
-    tts = gTTS(text=response_text, lang='en')
-    temp_audio = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-    tts.save(temp_audio.name)
-    return temp_audio.name
+# Read text from multiple PDFs in a directory
+def process_pdf_folder(directory):
+    text_data = ""
+    for file in os.listdir(directory):
+        if file.endswith(".pdf"):
+            pdf_file_path = os.path.join(directory, file)
+            text_data += extract_text(pdf_file_path) + "\n"
+    return text_data
 
-# Button to trigger JavaScript recording
-st.write("🎙️ Click to record your voice question:")
-st.markdown('<button onclick="startRecording()">Start Recording</button>', unsafe_allow_html=True)
-st.markdown('<button onclick="stopRecording()">Stop Recording</button>', unsafe_allow_html=True)
+# Define opioid-related keywords
+keywords = [
+    "heroin", "opioid crisis", "rehab", "tolerance", "substance abuse",
+    "overdose", "narcotics", "help", "opiates", "fentanyl",
+    "withdrawal", "opioids", "support", "addiction", "naloxone", "drugs", "painkillers"
+]
 
-# Upload recorded file
-st.write("🔼 Upload your recorded file (WAV format):")
-audio_file = st.file_uploader("Upload recorded audio", type=["wav"])
+# Determine if a question is relevant
+def validate_question(user_input):
+    return any(term.lower() in user_input.lower() for term in keywords)
 
-if audio_file is not None:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio:
-        temp_audio.write(audio_file.read())
-        temp_audio_path = temp_audio.name
+# Communicate with Llama 3 API for answers
+def query_llama3(question, context=""):
+    """Interacts with OpenRouter's Llama 3 API."""
+    
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
 
-    # Convert speech to text
-    transcribed_text = speech_to_text(temp_audio_path)
-    st.write(f"🗣️ Recognized Speech: {transcribed_text}")
+    prompt = f"""
+    As an opioid education expert, provide clear and precise answers using the given document.
+    If insufficient data is available, respond with: "I don't have enough information."
+    """
 
-    # Process the recognized text
-    if validate_question(transcribed_text):
-        response = query_llama3(transcribed_text, "")
+    data = {
+        "model": "meta-llama/llama-3-8b-instruct:free",
+        "messages": [{"role": "user", "content": question}],
+    }
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=data, timeout=10)
+        response.raise_for_status()
+        response_content = response.json()
+        result = response_content.get("choices", [{}])[0].get("message", {}).get("content", "No response").strip()
+
+        # Remove unnecessary phrases
+        for phrase in ["Based on the document", "According to the document"]:
+            result = result.replace(phrase, "").strip()
+
+        return result
+
+    except requests.exceptions.RequestException as error:
+        st.error(f"API Connection Error: {str(error)}")
+        return f"ERROR: Unable to connect to Llama 3. Details: {str(error)}"
+
+# Capture user input
+question = st.text_input("👤 You: Enter a question about opioids:")
+
+if question:
+    if validate_question(question):
+        response = query_llama3(question, "")
     else:
         response = "I can only respond to inquiries about opioids, addiction, overdose, or withdrawal."
 
     # Display chatbot response
     st.write(f"🤖 Chatbot: {response}")
-
-    # Convert chatbot response to speech
-    audio_response_path = text_to_speech(response)
-    st.audio(audio_response_path)
-
